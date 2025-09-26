@@ -60,6 +60,7 @@ class CatDbConnection(DbConnection):
 
     def connect(self):
         """Connect to the database"""
+        print("[DEBUG] CatDbConnection.connect() - Using local Pyrseas from /Users/josh/code/Pyrseas")
         super(CatDbConnection, self).connect()
         schs = self.fetchall("SELECT current_schemas(false)")
         addschs = [sch for sch in schs[0]["current_schemas"] if sch != "public"]
