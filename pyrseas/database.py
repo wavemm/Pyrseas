@@ -90,6 +90,17 @@ class Database(object):
 
             :param dbconn: a DbConnection object
             """
+            # Check if we're connected to CockroachDB
+            is_cockroachdb = False
+            if dbconn and dbconn.conn:
+                try:
+                    result = dbconn.fetchone("SELECT version()")
+                    if result and 'CockroachDB' in result['version']:
+                        is_cockroachdb = True
+                        print("[DEBUG] Detected CockroachDB - will skip non-table objects")
+                except:
+                    pass
+
             self.schemas = SchemaDict(dbconn)
             self.extensions = ExtensionDict(dbconn)
             self.languages = LanguageDict(dbconn)
