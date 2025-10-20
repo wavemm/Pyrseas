@@ -62,14 +62,18 @@ class CatDbConnection(DbConnection):
         """Connect to the database"""
         print("[DEBUG] CatDbConnection.connect() - Using local Pyrseas from /Users/josh/code/Pyrseas")
         super(CatDbConnection, self).connect()
+        print("[DEBUG] After super().connect()")
         schs = self.fetchall("SELECT current_schemas(false)")
+        print(f"[DEBUG] Got schemas: {schs}")
         addschs = [sch for sch in schs[0]["current_schemas"] if sch != "public"]
         srch_path = "pg_catalog"
         if addschs:
             srch_path += ", " + ", ".join(addschs)
+        print(f"[DEBUG] Setting search_path to: {srch_path}")
         self.execute("set search_path to %s" % srch_path)
         self.commit()
         self._version = self.conn.info.server_version
+        print("[DEBUG] CatDbConnection.connect() complete")
 
     @property
     def version(self):
@@ -358,11 +362,16 @@ class Database(object):
         the dictionary are then linked to related objects, e.g.,
         columns are linked to the tables they belong.
         """
+        print("[DEBUG] from_catalog() starting")
         self.db = self.Dicts(self.dbconn, single_db)
+        print("[DEBUG] Dicts created")
         self._build_dependency_graph(self.db, self.dbconn)
+        print("[DEBUG] Dependency graph built")
         if self.dbconn.conn:
             self.dbconn.conn.close()
+        print("[DEBUG] Connection closed")
         self._link_refs(self.db)
+        print("[DEBUG] from_catalog() complete")
 
     def from_map(self, input_map, langs=None):
         """Populate the new database objects from the input map
