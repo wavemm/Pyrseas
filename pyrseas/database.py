@@ -116,10 +116,10 @@ class Database(object):
                 self.tables = ClassDict(dbconn)
                 self.columns = ColumnDict(dbconn)
                 self.constraints = ConstraintDict(dbconn)
-
+                self.indexes = IndexDict(dbconn)
+                
                 # Initialize empty dicts for everything else
                 self.extensions = ExtensionDict()
-                self.indexes = IndexDict()
                 self.languages = LanguageDict()
                 self.casts = CastDict()
                 self.types = TypeDict()

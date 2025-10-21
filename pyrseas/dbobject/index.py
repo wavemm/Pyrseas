@@ -148,7 +148,31 @@ class Index(DbSchemaObject):
             extra = {}
             if col == '0':
                 expr = exprs[i]
-                if rest and rest[0] == '(':
+                # Strip curly braces that PostgreSQL adds in array notation
+                expr = expr.strip('{}')
+                # Strip quotes that CockroachDB adds around some expressions
+                expr = expr.strip('"')
+                # Strip outer parens from expressions if present - CockroachDB doesn't include them
+                if expr.startswith('(') and expr.endswith(')'):
+                    # Check if this is just wrapping parens (not part of the expression itself)
+                    # by counting paren depth
+                    depth = 0
+                    for idx, char in enumerate(expr):
+                        if char == '(':
+                            depth += 1
+                        elif char == ')':
+                            depth -= 1
+                            if depth == 0 and idx < len(expr) - 1:
+                                # Found closing paren before end, so outer parens are structural
+                                break
+                    else:
+                        # Closing paren is at the end, so outer parens might be wrapping
+                        # Try without them
+                        expr_without_outer = expr[1:-1]
+                        if rest.startswith(expr_without_outer):
+                            expr = expr_without_outer
+
+                if rest and rest[0] == '(' and not expr.startswith('('):
                     expr = '(' + expr + ')'
                 assert(rest.startswith(expr))
                 key = expr
