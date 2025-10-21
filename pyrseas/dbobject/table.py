@@ -959,12 +959,13 @@ class ClassDict(DbObjectDict):
                 table.primary_key = constr
             elif isinstance(constr, ForeignKey):
                 # link referenced and referrer
-                constr._references = self[(
-                    constr.ref_schema, constr.ref_table)]
-                self[
-                    (constr.ref_schema, constr.ref_table)
-                ]._referred_by.append(constr)
-                table.foreign_keys.update({cns: constr})
+                ref_key = (constr.ref_schema, constr.ref_table)
+                if ref_key in self:
+                    constr._references = self[ref_key]
+                    self[ref_key]._referred_by.append(constr)
+                    table.foreign_keys.update({cns: constr})
+                else:
+                    print(f"[DEBUG] Skipping FK constraint {cns} - referenced table {ref_key} not found")
             elif isinstance(constr, UniqueConstraint):
                 table.unique_constraints.update({cns: constr})
 

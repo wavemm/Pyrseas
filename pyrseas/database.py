@@ -95,15 +95,61 @@ class Database(object):
             :param dbconn: a DbConnection object
             """
             # Check if we're connected to CockroachDB
+            # We need to connect first before we can check the version
             is_cockroachdb = False
-            if dbconn and dbconn.conn:
+            # TODO(josh): not sure what is going on here.
+            if dbconn:
+                if not dbconn.conn:
+                    dbconn.connect()
                 try:
                     result = dbconn.fetchone("SELECT version()")
                     if result and 'CockroachDB' in result['version']:
                         is_cockroachdb = True
                         print("[DEBUG] Detected CockroachDB - will skip non-table objects")
-                except:
-                    pass
+                except Exception as e:
+                    print(f"[DEBUG] Exception checking version: {e}")
+
+            print(f"[DEBUG] is_cockroachdb={is_cockroachdb}")
+            if is_cockroachdb:
+                # Initialize only what we need for CockroachDB
+                self.schemas = SchemaDict(dbconn)
+                self.tables = ClassDict(dbconn)
+                self.columns = ColumnDict(dbconn)
+                self.constraints = ConstraintDict(dbconn)
+
+                # Initialize empty dicts for everything else
+                self.extensions = ExtensionDict()
+                self.indexes = IndexDict()
+                self.languages = LanguageDict()
+                self.casts = CastDict()
+                self.types = TypeDict()
+                self.functions = ProcDict()
+                self.operators = OperatorDict()
+                self.operclasses = OperatorClassDict()
+                self.operfams = OperatorFamilyDict()
+                self.rules = RuleDict()
+                self.triggers = TriggerDict()
+                self.conversions = ConversionDict()
+                self.tstempls = TSTemplateDict()
+                self.tsdicts = TSDictionaryDict()
+                self.tsparsers = TSParserDict()
+                self.tsconfigs = TSConfigurationDict()
+                self.fdwrappers = ForeignDataWrapperDict()
+                self.servers = ForeignServerDict()
+                self.usermaps = UserMappingDict()
+                self.ftables = ForeignTableDict()
+                self.collations = CollationDict()
+                self.eventtrigs = EventTriggerDict()
+
+                self._catalog_map = {
+                    'pg_namespace': self.schemas,
+                    'pg_class': self.tables,
+                    'pg_attribute': self.columns,
+                    'pg_constraint': self.constraints,
+                }
+                self._extkey_map = {}
+                print("[DEBUG] CockroachDB mode: initialized schemas and tables only")
+                return
 
             self.schemas = SchemaDict(dbconn)
             self.extensions = ExtensionDict(dbconn)
@@ -280,27 +326,36 @@ class Database(object):
         # The dependencies across views is not in pg_depend. We have to
         # parse the rewrite rule.  "ev_class >= 16384" is to exclude
         # system views.
-        query = r"""SELECT DISTINCT 'pg_class' AS class_name, ev_class,
-                          CASE WHEN depid[1] = 'relid' THEN 'pg_class'
-                               WHEN depid[1] = 'funcid' THEN 'pg_proc'
-                               END AS refclass, depid[2]::oid AS refobjid
-                   FROM (SELECT ev_class, regexp_matches(ev_action,
-                                ':(relid|funcid)\s+(\d+)', 'g') AS depid
-                         FROM pg_rewrite
-                         WHERE rulename = '_RETURN'
-                         AND ev_class >= 16384) x
-                         LEFT JOIN pg_class c
-                              ON (depid[1], depid[2]::oid) = ('relid', c.oid)
-                         LEFT JOIN pg_namespace cs ON cs.oid = relnamespace
-                         LEFT JOIN pg_proc p
-                              ON (depid[1], depid[2]::oid) = ('funcid', p.oid)
-                         LEFT JOIN pg_namespace ps ON ps.oid = pronamespace
-                   WHERE ev_class <> depid[2]::oid
-                   AND coalesce(cs.nspname, ps.nspname)
-                         NOT IN ('information_schema', 'pg_catalog')"""
-        for r in dbconn.fetchall(query):
-            alldeps[r['class_name'], r['ev_class']].append(
-                (r['refclass'], r['refobjid']))
+        # TODO(josh): Find another way to build dep graph?
+        is_cockroachdb = False
+        if dbconn and dbconn.conn:
+            result = dbconn.fetchone("SELECT version()")
+            if result and 'CockroachDB' in result['version']:
+                is_cockroachdb = True
+                print("[DEBUG] Skipping view dependency parsing for CockroachDB")
+
+        if not is_cockroachdb:
+            query = r"""SELECT DISTINCT 'pg_class' AS class_name, ev_class,
+                              CASE WHEN depid[1] = 'relid' THEN 'pg_class'
+                                   WHEN depid[1] = 'funcid' THEN 'pg_proc'
+                                   END AS refclass, depid[2]::oid AS refobjid
+                       FROM (SELECT ev_class, regexp_matches(ev_action,
+                                    ':(relid|funcid)\s+(\d+)', 'g') AS depid
+                             FROM pg_rewrite
+                             WHERE rulename = '_RETURN'
+                             AND ev_class >= 16384) x
+                             LEFT JOIN pg_class c
+                                  ON (depid[1], depid[2]::oid) = ('relid', c.oid)
+                             LEFT JOIN pg_namespace cs ON cs.oid = relnamespace
+                             LEFT JOIN pg_proc p
+                                  ON (depid[1], depid[2]::oid) = ('funcid', p.oid)
+                             LEFT JOIN pg_namespace ps ON ps.oid = pronamespace
+                       WHERE ev_class <> depid[2]::oid
+                       AND coalesce(cs.nspname, ps.nspname)
+                             NOT IN ('information_schema', 'pg_catalog')"""
+            for r in dbconn.fetchall(query):
+                alldeps[r['class_name'], r['ev_class']].append(
+                    (r['refclass'], r['refobjid']))
 
         # Add the dependencies between a table and other objects through the
         # columns defaults
