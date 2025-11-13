@@ -117,12 +117,12 @@ class Database(object):
                 self.columns = ColumnDict(dbconn)
                 self.constraints = ConstraintDict(dbconn)
                 self.indexes = IndexDict(dbconn)
-                
+                self.types = TypeDict(dbconn)  # CRDB supports ENUMs and other types
+
                 # Initialize empty dicts for everything else
                 self.extensions = ExtensionDict()
                 self.languages = LanguageDict()
                 self.casts = CastDict()
-                self.types = TypeDict()
                 self.functions = ProcDict()
                 self.operators = OperatorDict()
                 self.operclasses = OperatorClassDict()
@@ -146,6 +146,8 @@ class Database(object):
                     'pg_class': self.tables,
                     'pg_attribute': self.columns,
                     'pg_constraint': self.constraints,
+                    'pg_index': self.indexes,
+                    'pg_type': self.types,
                 }
                 self._extkey_map = {}
                 print("[DEBUG] CockroachDB mode: initialized schemas and tables only")
