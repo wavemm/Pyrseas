@@ -121,3 +121,17 @@ class PostgresDb(object):
         row = curs.fetchone()
         curs.close()
         return row
+
+
+def is_cockroachdb(dbconn):
+    """Check if the database connection is to a CockroachDB instance
+    """
+    # Ensure we have a connection
+    if dbconn is None:
+        return False
+
+    try:
+        result = dbconn.fetchone("SELECT version()")
+        return 'CockroachDB' in result.get('version', '')
+    except Exception as e:
+        print(f"[pyrseas] Exception checking DB version: {e}")
