@@ -492,7 +492,7 @@ class Aggregate(Proc):
                    aggtranstype::regtype AS stype, aggtransspace AS sspace,
                    aggfinalfn::regproc AS finalfunc,
                    aggfinalextra AS finalfunc_extra,
-                   agginitval AS initcond, aggsortop::regoper AS sortop,
+                   agginitval AS initcond, sortop_operator.oprname AS sortop,
                    aggmtransfn::regproc AS msfunc,
                    aggminvtransfn::regproc AS minvfunc,
                    aggmtranstype::regtype AS mstype,
@@ -507,6 +507,7 @@ class Aggregate(Proc):
             FROM pg_proc p JOIN pg_roles r ON (r.oid = proowner)
                  JOIN pg_namespace n ON (pronamespace = n.oid)
                  LEFT JOIN pg_aggregate a ON (p.oid = aggfnoid)
+                 LEFT JOIN pg_operator sortop_operator ON (a.aggsortop = sortop_operator.oid)
             WHERE (nspname != 'pg_catalog' AND nspname != 'information_schema')
               %s
               AND p.oid NOT IN (

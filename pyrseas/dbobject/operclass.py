@@ -65,14 +65,19 @@ class OperatorClass(DbSchemaObject):
     def opquery():
         return """
             SELECT nspname AS schema, opcname AS name, amname AS index_method,
-                   amopstrategy AS strategy, amopopr::regoperator AS operator
-            FROM pg_opclass o JOIN pg_am a ON (opcmethod = a.oid)
-                 JOIN pg_namespace n ON (opcnamespace = n.oid), pg_amop ao,
-                 pg_depend
-            WHERE refclassid = 'pg_opclass'::regclass
-              AND classid = 'pg_amop'::regclass AND objid = ao.oid
-              AND refobjid = o.oid
-              AND (nspname != 'pg_catalog' AND nspname != 'information_schema')
+                   amopstrategy AS strategy,
+                   op.oprname || '(' ||
+                       COALESCE(op.oprleft::regtype::text, 'NONE') || ',' ||
+                       COALESCE(op.oprright::regtype::text, 'NONE') || ')' AS operator
+            FROM pg_opclass o
+                 JOIN pg_am a ON (opcmethod = a.oid)
+                 JOIN pg_namespace n ON (opcnamespace = n.oid)
+                 JOIN pg_depend ON (refobjid = o.oid
+                                    AND refclassid = 'pg_opclass'::regclass
+                                    AND classid = 'pg_amop'::regclass)
+                 JOIN pg_amop ao ON (objid = ao.oid)
+                 LEFT JOIN pg_operator op ON (ao.amopopr = op.oid)
+            WHERE (nspname != 'pg_catalog' AND nspname != 'information_schema')
               AND o.oid NOT IN (
                   SELECT objid FROM pg_depend WHERE deptype = 'e'
                                AND classid = 'pg_opclass'::regclass)

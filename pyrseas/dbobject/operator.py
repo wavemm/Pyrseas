@@ -54,20 +54,22 @@ class Operator(DbSchemaObject):
     @staticmethod
     def query(dbversion=None):
         return """
-            SELECT nspname AS schema, oprname AS name, rolname AS owner,
-                   oprleft::regtype AS leftarg, oprright::regtype AS rightarg,
-                   oprcode AS procedure, oprcom::regoper AS commutator,
-                   oprnegate::regoper AS negator, oprrest AS restrict,
-                   oprjoin AS join, oprcanhash AS hashes,
-                   oprcanmerge AS merges,
+            SELECT nspname AS schema, o.oprname AS name, rolname AS owner,
+                   o.oprleft::regtype AS leftarg, o.oprright::regtype AS rightarg,
+                   o.oprcode AS procedure, comm_op.oprname AS commutator,
+                   neg_op.oprname AS negator, o.oprrest AS restrict,
+                   o.oprjoin AS join, o.oprcanhash AS hashes,
+                   o.oprcanmerge AS merges,
                    obj_description(o.oid, 'pg_operator') AS description, o.oid
             FROM pg_operator o JOIN pg_roles r ON (r.oid = oprowner)
                  JOIN pg_namespace n ON (oprnamespace = n.oid)
+                 LEFT JOIN pg_operator comm_op ON (o.oprcom = comm_op.oid)
+                 LEFT JOIN pg_operator neg_op ON (o.oprnegate = neg_op.oid)
             WHERE (nspname != 'pg_catalog' AND nspname != 'information_schema')
               AND o.oid NOT IN (
                   SELECT objid FROM pg_depend WHERE deptype = 'e'
                                AND classid = 'pg_operator'::regclass)
-            ORDER BY nspname, oprname"""
+            ORDER BY nspname, o.oprname"""
 
     @staticmethod
     def from_map(name, schema, leftarg, rightarg, inobj):
