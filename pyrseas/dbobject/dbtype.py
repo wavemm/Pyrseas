@@ -376,7 +376,7 @@ class Enum(DbType):
                    array_to_string(typacl, ',') AS privileges,
                    ARRAY(SELECT enumlabel FROM pg_enum e
                          WHERE t.oid = enumtypid
-                         ORDER BY e.oid) AS labels,
+                         ORDER BY e.enumsortorder) AS labels,
                    obj_description(t.oid, 'pg_type') AS description, t.oid
             FROM pg_type t JOIN pg_roles r ON (r.oid = typowner)
                  JOIN pg_namespace n ON (typnamespace = n.oid)
